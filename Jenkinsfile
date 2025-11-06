@@ -3,54 +3,45 @@ pipeline {
 
     environment {
         DOCKER_USER = 'vigneshmarimuthu06'
-        // Uses Jenkins credential ID 'dockerhub' (Username with password)
+        // Jenkins credential ID for DockerHub (Username + Password or PAT)
+        CREDENTIAL_ID = 'dockerhub'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM',
-                    branches: [[name: 'dev']],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/vigneshmarimuthu/React-App-CI-CD.git',
-                        credentialsId: 'dockerhub'
-                    ]]
-                ])
+                checkout scm
             }
         }
 
-        stage('Build and Push to Dev') {
+        stage('Build and Push Image') {
             steps {
                 script {
-                    echo '--- Building and Pushing to Dev Repo ---'
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh '''
-                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                        docker build -t $DOCKER_USER/dev:latest .
-                        docker push $DOCKER_USER/dev:latest
-                        docker logout
-                        '''
-                    }
-                }
-            }
-        }
+                    withCredentials([usernamePassword(credentialsId: CREDENTIAL_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        
+                        // Determine branch
+                        def branchName = env.BRANCH_NAME ?: sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
 
-        stage('Build, Push, and Deploy to Prod') {
-            when {
-                branch 'main'
-            }
-            steps {
-                script {
-                    echo '--- Building and Pushing to Prod Repo ---'
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh '''
-                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                        docker build -t $DOCKER_USER/prod:latest .
-                        docker push $DOCKER_USER/prod:latest
-                        docker logout
-                        '''
+                        if (branchName == "dev") {
+                            echo "🔧 Detected branch: dev — Building and pushing Dev image..."
+                            sh '''
+                                echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                                docker build -t $DOCKER_USER/dev:latest .
+                                docker push $DOCKER_USER/dev:latest
+                                docker logout
+                            '''
+                        } else if (branchName == "main" || branchName == "master") {
+                            echo "🚀 Detected branch: main/master — Building and pushing Prod image..."
+                            sh '''
+                                echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                                docker build -t $DOCKER_USER/prod:latest .
+                                docker push $DOCKER_USER/prod:latest
+                                docker logout
+                            '''
+                        } else {
+                            echo "⚠️ Branch '${branchName}' not configured for Docker push. Skipping image push."
+                        }
                     }
-                    echo '✅ Deploy to production steps go here (e.g., docker run, ECS deploy, etc.)'
                 }
             }
         }
@@ -58,7 +49,7 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline finished. Cleaning up...'
+            echo "✅ Pipeline finished for branch: ${env.BRANCH_NAME}"
         }
     }
 }
