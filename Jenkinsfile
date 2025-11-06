@@ -14,28 +14,6 @@ stages {
         }
     }
 
-    stage('Build, Push, and Deploy Dev') {
-        steps {
-            script {
-                withCredentials([usernamePassword(credentialsId: CREDENTIAL_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    echo "🔧 Building and pushing Dev image..."
-                    sh '''
-                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                        docker build -t $DOCKER_USER/dev:latest .
-                        docker push $DOCKER_USER/dev:latest
-                        docker logout
-                    '''
-                    echo "🚀 Deploying Dev container..."
-                    sh '''
-                        docker stop dev || true
-                        docker rm dev || true
-                        docker run -d --name dev -p 8080:80 $DOCKER_USER/dev:latest
-                    '''
-                }
-            }
-        }
-    }
-
     stage('Build, Push, and Deploy Prod') {
         steps {
             script {
