@@ -61,7 +61,7 @@ stages {
 
 post {
     always {
-        echo "Pipeline finished for branch: ${env.BRANCH_NAME ?: 'unknown'}"
+        echo "Pipeline finished for branch: ${env.BRANCH_NAME}"
     }
 }
 
