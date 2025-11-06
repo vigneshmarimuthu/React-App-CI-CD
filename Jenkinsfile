@@ -3,8 +3,7 @@ pipeline {
 
     environment {
         DOCKER_USER = 'vigneshmarimuthu06'
-        // Jenkins credential ID for DockerHub (Username + Password or PAT)
-        CREDENTIAL_ID = 'dockerhub'
+        CREDENTIAL_ID = 'dockerhub' // DockerHub credential ID in Jenkins
     }
 
     stages {
@@ -18,30 +17,28 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: CREDENTIAL_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        
-                        // Determine branch
-                        def branchName = env.BRANCH_NAME ?: sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                        echo "🚀 Building and pushing image to DockerHub (prod)..."
 
-                        if (branchName == "dev") {
-                            echo "🔧 Detected branch: dev — Building and pushing Dev image..."
-                            sh '''
-                                echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                                docker build -t $DOCKER_USER/dev:latest .
-                                docker push $DOCKER_USER/dev:latest
-                                docker logout
-                            '''
-                        } else if (branchName == "main" || branchName == "master") {
-                            echo "🚀 Detected branch: main/master — Building and pushing Prod image..."
-                            sh '''
-                                echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                                docker build -t $DOCKER_USER/prod:latest .
-                                docker push $DOCKER_USER/prod:latest
-                                docker logout
-                            '''
-                        } else {
-                            echo "⚠️ Branch '${branchName}' not configured for Docker push. Skipping image push."
-                        }
+                        sh '''
+                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                            docker build -t $DOCKER_USER/prod:latest .
+                            docker push $DOCKER_USER/prod:latest
+                            docker logout
+                        '''
                     }
+                }
+            }
+        }
+
+        stage('Deploy Container') {
+            steps {
+                script {
+                    echo "📦 Deploying container from DockerHub image..."
+                    sh '''
+                        docker rm -f myapp || true
+                        docker pull $DOCKER_USER/prod:latest
+                        docker run -d -p 80:80 --name myapp $DOCKER_USER/prod:latest
+                    '''
                 }
             }
         }
@@ -49,7 +46,7 @@ pipeline {
 
     post {
         always {
-            echo "✅ Pipeline finished for branch: ${env.BRANCH_NAME}"
+            echo "✅ Pipeline completed successfully. Image deployed: ${DOCKER_USER}/prod:latest"
         }
     }
 }
