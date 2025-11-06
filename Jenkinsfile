@@ -14,44 +14,45 @@ stages {
         }
     }
 
-    stage('Build, Push, and Deploy') {
+    stage('Build, Push, and Deploy Dev') {
         steps {
             script {
                 withCredentials([usernamePassword(credentialsId: CREDENTIAL_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    
-                    // Get branch name
-                    def branchName = env.BRANCH_NAME ?: sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
-                    echo "Current branch: ${branchName}"
+                    echo "🔧 Building and pushing Dev image..."
+                    sh '''
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker build -t $DOCKER_USER/dev:latest .
+                        docker push $DOCKER_USER/dev:latest
+                        docker logout
+                    '''
+                    echo "🚀 Deploying Dev container..."
+                    sh '''
+                        docker stop dev || true
+                        docker rm dev || true
+                        docker run -d --name dev -p 8080:80 $DOCKER_USER/dev:latest
+                    '''
+                }
+            }
+        }
+    }
 
-                    if (branchName == "dev") {
-                        echo "🔧 Building and pushing Dev image..."
-                        sh '''
-                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                            docker build -t $DOCKER_USER/dev:latest .
-                            docker push $DOCKER_USER/dev:latest
-                            docker logout
-                        '''
-                        echo "🚀 Deploying Dev container..."
-                        sh '''
-                            docker stop dev || true
-                            docker rm dev || true
-                            docker run -d --name dev -p 80:80 $DOCKER_USER/dev:latest
-                        '''
-                    } else {
-                        echo "🚀 Building and pushing Prod image..."
-                        sh '''
-                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                            docker build -t $DOCKER_USER/prod:latest .
-                            docker push $DOCKER_USER/prod:latest
-                            docker logout
-                        '''
-                        echo "✅ Deploying Prod container..."
-                        sh '''
-                            docker stop prod || true
-                            docker rm prod || true
-                            docker run -d --name prod -p 80:80 $DOCKER_USER/prod:latest
-                        '''
-                    }
+    stage('Build, Push, and Deploy Prod') {
+        steps {
+            script {
+                withCredentials([usernamePassword(credentialsId: CREDENTIAL_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    echo "🚀 Building and pushing Prod image..."
+                    sh '''
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker build -t $DOCKER_USER/prod:latest .
+                        docker push $DOCKER_USER/prod:latest
+                        docker logout
+                    '''
+                    echo "✅ Deploying Prod container..."
+                    sh '''
+                        docker stop prod || true
+                        docker rm prod || true
+                        docker run -d --name prod -p 80:80 $DOCKER_USER/prod:latest
+                    '''
                 }
             }
         }
@@ -60,7 +61,7 @@ stages {
 
 post {
     always {
-        echo "Pipeline finished for branch: ${env.BRANCH_NAME}"
+        echo "Pipeline finished for branch: ${env.BRANCH_NAME ?: 'unknown'}"
     }
 }
 
