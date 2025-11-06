@@ -1,11 +1,15 @@
-# Use the official Nginx image to serve static files
-FROM nginx:alpine
+# Use a lightweight and stable Nginx version
+FROM nginx:stable-alpine
 
-# Copy all static files from your project directory to Nginx HTML folder
+# Remove the default Nginx index.html to prevent conflicts
+RUN rm /usr/share/nginx/html/index.html
+
+# Copy all files from the current directory (your compiled app) 
+# into the Nginx web root directory
 COPY . /usr/share/nginx/html
 
-# Expose port 80
+# Expose the standard HTTP port 
 EXPOSE 80
 
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# The default Nginx command will run, serving your files
+# CMD ["nginx", "-g", "daemon off;"]
