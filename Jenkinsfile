@@ -82,7 +82,7 @@ pipeline {
                             docker stop prod || true
                             docker rm prod || true
                             # Using port 8080 for Prod to avoid conflict with Dev on port 80
-                            docker run -d --name prod -p 8080:80 $DOCKER_USER/prod:latest
+                            docker run -d --name prod -p 9090:80 $DOCKER_USER/prod:latest
                         '''
                     }
                 }
