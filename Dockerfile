@@ -1,15 +1,17 @@
-# Use a lightweight and stable Nginx version
+# Stage 1: Nginx lightweight image
 FROM nginx:stable-alpine
 
-# Remove the default Nginx index.html to prevent conflicts
-RUN rm /usr/share/nginx/html/index.html
+# Remove default Nginx index to prevent conflicts
+RUN rm -rf /usr/share/nginx/html/*
 
-# Copy all files from the current directory (your compiled app) 
-# into the Nginx web root directory
-COPY . /usr/share/nginx/html
+# Copy only the build folder contents into Nginx web root
+COPY build/ /usr/share/nginx/html
 
-# Expose the standard HTTP port 
+# Ensure proper permissions
+RUN chmod -R 755 /usr/share/nginx/html
+
+# Expose HTTP port
 EXPOSE 80
 
-# The default Nginx command will run, serving your files
-# CMD ["nginx", "-g", "daemon off;"]
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]
