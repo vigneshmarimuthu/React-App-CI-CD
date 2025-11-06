@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+web:
+image: my-dockerhub-user/dev:latest
+# pipeline will update tags or use image pull
+ports:
+- "80:80"
+restart: always
