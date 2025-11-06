@@ -16,13 +16,17 @@ pipeline {
         // --- DEV STAGE (Runs ONLY on the 'dev' branch) ---
         stage('Build, Push, and Deploy to Dev') {
             when {
-                // Use 'expression' with the more reliable 'git symbolic-ref --short HEAD' command
+                // Use 'expression' to check env.GIT_BRANCH and strip 'origin/'
                 expression {
-                    def currentBranch = env.BRANCH_NAME
-                    if (currentBranch == null) {
-                        // Use git symbolic-ref to correctly resolve the branch name from HEAD
-                        currentBranch = sh(script: "git symbolic-ref --short HEAD || echo 'UNKNOWN'", returnStdout: true).trim()
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH // Prioritize BRANCH_NAME, fallback to GIT_BRANCH
+                    
+                    if (currentBranch != null) {
+                        // Clean the branch name (e.g., changes 'origin/dev' to 'dev')
+                        currentBranch = currentBranch.replace('origin/', '')
+                    } else {
+                        currentBranch = 'UNKNOWN' // Fallback if no variable is set
                     }
+                    
                     echo "Checking branch for Dev deployment: ${currentBranch}"
                     return currentBranch == 'dev'
                 }
@@ -52,12 +56,16 @@ pipeline {
             when {
                 // Apply the same robust branch checking logic for 'main'
                 expression {
-                    def currentBranch = env.BRANCH_NAME
-                    if (currentBranch == null) {
-                        currentBranch = sh(script: "git symbolic-ref --short HEAD || echo 'UNKNOWN'", returnStdout: true).trim()
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH
+
+                    if (currentBranch != null) {
+                        currentBranch = currentBranch.replace('origin/', '')
+                    } else {
+                        currentBranch = 'UNKNOWN'
                     }
+                    
                     echo "Checking branch for Prod deployment: ${currentBranch}"
-                    return currentBranch == 'main'
+                    return currentBranch == 'main' // Change to 'master' if that is your production branch
                 }
             }
             steps {
@@ -73,6 +81,7 @@ pipeline {
                             # Deployment steps for Prod
                             docker stop prod || true
                             docker rm prod || true
+                            # Using port 8080 for Prod to avoid conflict with Dev on port 80
                             docker run -d --name prod -p 8080:80 $DOCKER_USER/prod:latest
                         '''
                     }
@@ -83,8 +92,12 @@ pipeline {
 
     post {
         always {
-            // Also update the post-stage echo for clarity
-            echo "Pipeline finished for branch: ${env.BRANCH_NAME ?: sh(script: 'git symbolic-ref --short HEAD || echo UNKNOWN', returnStdout: true).trim()}"
+            script {
+                // Final echo, ensuring the correct, clean branch name is displayed
+                def finalBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'UNKNOWN'
+                finalBranch = finalBranch.replace('origin/', '')
+                echo "Pipeline finished for branch: ${finalBranch}"
+            }
         }
     }
 }
